@@ -68,6 +68,7 @@ python hybridnet.py
 ```
 ## Model Inference
 The model processes input images as follows:
+
 **Preprocessing :** Input images are resized to 512x384 and normalized using the ImageNet mean and standard deviation values:
 
 Mean: [0.485, 0.456, 0.406]
