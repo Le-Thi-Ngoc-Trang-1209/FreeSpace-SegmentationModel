@@ -145,6 +145,9 @@ with dai.Pipeline() as pipeline:
             cv2.waitKey(1)
             vis_out = cv2.resize(vis, (1280,720))
             out.write(vis_out)
+            if cv2.waitKey(1) == ord("q"):
+                break
+            
 
         frame_count += 1
 

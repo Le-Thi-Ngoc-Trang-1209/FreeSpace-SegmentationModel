@@ -1,2 +1,5 @@
 onnxruntime
 matplotlib
+###onnxruntime_gpu-1.23.2-cp310-cp310-linux_aarch64.whl
+numpy==1.26.4
+depthai==3.1.0

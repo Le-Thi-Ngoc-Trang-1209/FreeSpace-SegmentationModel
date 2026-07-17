@@ -7,7 +7,7 @@ Gst.init(None)
 class RTSPReader:
     def __init__(self, rtsp):
         pipeline = f"""
-        rtspsrc location={rtsp} latency=200 protocols=tcp !
+        rtspsrc location={rtsp} latency=100 protocols=tcp !
         rtph265depay !
         h265parse !
         nvv4l2decoder !
@@ -37,17 +37,16 @@ class RTSPReader:
         buf.unmap(mapinfo)
         return True, frame
         
-        
-        
-"""# ========================
 # MAIN: read + save video
 # ========================
-rtsp_url = "rtsp://10.21.1.64:8554/preview"
-
+        #video/x-raw,width=512,height=384,format=RGBA !
+        #appsink name=sink drop=true max-buffers=1 sync=false
+"""rtsp_url = "rtsp://169.254.150.5:8554/preview"
+#rtsp_url = "rtsp://localhost:8554/mystream"
 reader = RTSPReader(rtsp_url)
 # ✅ VideoWriter
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-out = cv2.VideoWriter('output2.mp4', fourcc, 25, (1280, 720))
+out = cv2.VideoWriter('ng_ld.mp4', fourcc, 25, (1280, 720))
 while True:
     ret, frame = reader.read()
     if not ret:

@@ -1,8 +1,11 @@
 import cv2
 import onnxruntime
 import numpy as np
-import depthai as dai
 from oak4_rtsp_reader import RTSPReader
+import time
+
+
+print("Available:", onnxruntime.get_available_providers())
 
 INPUT_WIDTH = 512
 INPUT_HEIGHT = 384
@@ -47,7 +50,7 @@ def draw_seg(seg_map, image, alpha=0.5):
     color_segmap = segmentation_colors[seg_map]
     color_segmap = cv2.resize(color_segmap, (image.shape[1], image.shape[0]))
 
-    combined_img = cv2.addWeighted(image, alpha, color_segmap, (1 - alpha), 0)
+    combined_img = cv2.addWeighted(image, 1, color_segmap, (1 - alpha), 0)
     return combined_img
 
 
@@ -62,7 +65,7 @@ def compute_center_line(seg_map, frame):
     road_mask = (seg_full == ROAD_CLASS_ID)
     center_points = []
 
-    for y in range(int(H * 0.6), int(H * 0.85)):
+    for y in range(int(H * 0.61), int(H * 0.88)):
         xs = np.where(road_mask[y])[0]
         if len(xs) > W * 0.05:
             # KEY: percentile instead of min/max
@@ -90,7 +93,7 @@ def compute_center_line(seg_map, frame):
 def draw_center_line(frame, points):
     if len(points) > 1:
         pts = np.array(points, np.int32).reshape((-1, 1, 2))
-        cv2.polylines(frame, [pts], False, (0, 255, 0), 10)
+        cv2.polylines(frame, [pts], False, (0, 255, 0), 15)
     return frame
 
 
@@ -100,31 +103,38 @@ def draw_center_line(frame, points):
 #cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
 #cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
-session = onnxruntime.InferenceSession("model_data/hybridnets_384x512.onnx")
+session = onnxruntime.InferenceSession(
+    "model_data/hybridnets_384x512.onnx",
+     providers=["CUDAExecutionProvider",
+     "CPUExecutionProvider"])
+print("Session:", session.get_providers())
 
 cv2.namedWindow("Road Detections", cv2.WINDOW_NORMAL)
 
-out = cv2.VideoWriter(
+"""out = cv2.VideoWriter(
     'outputs/v2.mp4',
     cv2.VideoWriter_fourcc(*'mp4v'),
     20,
     (1280, 720)
-)
+)"""
 frame_count = 0
-skip_frames = 2
+skip_frames = 1
 
-RTSP = "rtsp://10.21.1.64:8554/preview"
+RTSP = "rtsp://169.254.150.5:8554/preview"
 reader = RTSPReader(RTSP)
 # ================== OAK PIPELINE ==================
 while True:
     ret, frame = reader.read()
-    cv2.imshow("Road Detections", frame)
+    
     if not ret:
         continue
     if frame_count % skip_frames == 0:
         # ===== Inference =====
+        t0 = time.perf_counter()
         input_tensor = prepare_input(frame)
+        t1 = time.perf_counter()
         outputs, output_names = inference(session, input_tensor)
+        t2 = time.perf_counter()
         out_seg = outputs[output_names.index("segmentation")]
         seg_map = np.squeeze(np.argmax(out_seg, axis=1))
 
@@ -133,18 +143,24 @@ while True:
 
         # ===== Center line =====
         center_points = compute_center_line(seg_map, frame)
-        print(frame_count)
+        #print(frame_count)
         vis = draw_center_line(vis, center_points)
 
         # ===== Show =====
-        #cv2.imshow("Road Detections", vis)
+        cv2.imshow("Road Detections", vis)
+        t3 = time.perf_counter()
+        print(f"prep={(t1-t0)*1000:.1f}ms "
+            f"infer={(t2-t1)*1000:.1f}ms"
+            f"draw={(t3-t2)*1000:.1f}ms")
         #vis_out = cv2.resize(vis, (1280, 720))
         #out.write(vis_out)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
 
     frame_count += 1
 
 
 
-#cap.release()#
+cap.release()
 #out.release()
 cv2.destroyAllWindows()
